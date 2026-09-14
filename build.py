@@ -3,8 +3,8 @@
 #
 # 三个文件各自用 IIFE 包一层隔离作用域：
 #   引擎把 API 挂到 window.SH，联机库把构造器挂到 window.PuzzleClient，界面再取用。
-# 联机库是 vendored 的副本（源在 puzzle-server/web/puzzle-client.js），
-# 同步用 puzzle-server/tools/sync_client.sh；内联而不是外链，是为了保住"离线单文件"。
+# 联机库是 vendored 的副本（源在本仓库 server/web/puzzle-client.js），
+# 一致性由 CI 的 server job 逐字节对照把关；内联而不是外链，是为了保住"离线单文件"。
 import io, os
 
 base = os.path.dirname(os.path.abspath(__file__))

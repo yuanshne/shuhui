@@ -1,9 +1,10 @@
 name: CI
 
-# 三件事，各自独立：
+# 四件事，各自独立：
 #   build  —— 仓库里那份单文件产物，必须能从 src/ 重新构建出一模一样的字节
 #   test   —— 离线玩法（不需要任何后端）
-#   online —— 联机端到端（需要姊妹仓库 puzzle-server；没有就跳过，见下）
+#   server —— 内置后端的 pytest 单测 + 联机库逐字节对照
+#   online —— 联机端到端（用本仓库 server/ 起真后端）
 on:
   push:
     branches: [main]
@@ -59,52 +60,61 @@ jobs:
         working-directory: tests
         run: node test.mjs
 
+  server:
+    name: 后端单测（pytest）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: server/requirements.txt
+
+      - name: 安装后端依赖
+        run: pip install --quiet -r server/requirements.txt
+
+      - name: 联机库与后端保持逐字节一致
+        # src/puzzle-client.js 是 server/web/puzzle-client.js 的 vendored 副本。
+        # 原先这步由 puzzle-server 仓库的 sync_client.sh --check 把关，
+        # 现在后端就在本仓库里，一条 cmp 就够了。
+        run: cmp src/puzzle-client.js server/web/puzzle-client.js
+
+      - name: pytest
+        working-directory: server
+        run: python -m pytest -q
+
   online:
-    name: 联机端到端（跨仓库）
+    name: 联机端到端（内置后端）
     runs-on: ubuntu-latest
     env:
       CHROME_PATH: /usr/bin/google-chrome
     steps:
       - uses: actions/checkout@v4
-        with:
-          path: game
 
-      - name: 检出后端仓库
-        # 后端是姊妹仓库 yuanshne/puzzle-server。联机是"加成"不是前提，
-        # 所以它没检出（还没公开 / 网络问题）时只跳过联机用例，不让 CI 变红。
-        continue-on-error: true
-        uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          repository: yuanshne/puzzle-server
-          path: puzzle-server
+          python-version: "3.12"
+
+      - name: 装后端依赖
+        # 建在 server/.venv：online.mjs 找解释器的顺序里就有这一条，
+        # 顺带也就验证了"换台机器能跑起来"。
+        run: |
+          python3 -m venv server/.venv
+          server/.venv/bin/pip install --quiet -r server/requirements.txt
 
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: game/tests/package-lock.json
-
-      - name: 装后端依赖
-        # 建在 puzzle-server/.venv：online.mjs 找解释器的顺序里就有这一条，
-        # 顺带也就验证了"换台机器能跑起来"。
-        run: |
-          if [ ! -f puzzle-server/app/main.py ]; then
-            echo "后端仓库没检出，跳过联机用例。"
-            exit 0
-          fi
-          python3 -m venv puzzle-server/.venv
-          puzzle-server/.venv/bin/pip install --quiet -r puzzle-server/requirements.txt
+          cache-dependency-path: tests/package-lock.json
 
       - name: 安装测试依赖
-        working-directory: game/tests
+        working-directory: tests
         run: npm ci
 
       - name: 联机端到端
         # 会自己起一个 uvicorn + 一个静态服务，然后开两个玩家跑完整链路。
-        working-directory: game/tests
-        run: |
-          if [ ! -f ../../puzzle-server/app/main.py ]; then
-            echo "后端仓库没检出，跳过联机用例。"
-            exit 0
-          fi
-          node online.mjs
+        working-directory: tests
+        run: node online.mjs

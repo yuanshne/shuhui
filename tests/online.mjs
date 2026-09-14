@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const GAME = path.join(HERE, '..');                  // 数回仓库根
-const SERVER = path.join(GAME, '..', 'puzzle-server'); // 后端仓库根
+const SERVER = path.join(GAME, 'server'); // 内置后端目录
 const SHOTS = path.join(HERE, 'shots');
 const require = createRequire(import.meta.url);
 fs.mkdirSync(SHOTS, { recursive: true });

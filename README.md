@@ -106,8 +106,8 @@
 
 ### 联机库从哪来
 
-`src/puzzle-client.js` 是从后端仓库 `puzzle-server/web/puzzle-client.js`
-**vendored** 过来的副本（内容逐字节相同）。四个游戏共用同一个库。
+`src/puzzle-client.js` 是从本仓库 `server/web/puzzle-client.js`
+**vendored** 过来的副本（内容逐字节相同）。
 
 不选择运行时去后端拉一个 JS，是为了保住「单文件、零依赖」这条底线：
 `file://` 下跨源加载会被浏览器拦掉，断网时更是直接白屏。代价是有可能漂移，
@@ -188,7 +188,7 @@ UNKNOWN(-1) 未定   OFF(0) 确定不在回路上   ON(1) 确定在回路上
 index.html                 游戏（构建产物，双击即玩）
 build.py                   构建：内联 src/*.js 到 template.html
 src/engine.js              引擎：盘面、传播、求解、出题（Node 与浏览器双端可用）
-src/puzzle-client.js       联机库（vendored，源在 puzzle-server/web/）
+src/puzzle-client.js       联机库（vendored，源在 server/web/）
 src/game.js                界面逻辑：渲染、交互、计时计分、存档、联机接线
 src/template.html          骨架与样式
 src/engine.test.mjs        引擎测试：18 组
@@ -216,7 +216,7 @@ node online.mjs
 `tests/chrome.mjs` 会按 `CHROME_PATH` 环境变量 → Playwright 浏览器缓存 → 本机已安装 Chrome
 的顺序找浏览器，所以换一台机器也能直接跑。
 
-`online.mjs` 需要 Python 3 和 `puzzle-server` 仓库放在同级目录（它自己会拉起 uvicorn、
+`online.mjs` 需要 Python 3（后端已内置在本仓库 `server/` 目录，它自己会拉起 uvicorn、
 用临时 SQLite 灌好题池、再起一个静态服务把游戏页面发出去）。解释器按
 `PYTHON` 环境变量 → 仓库内 `.venv` → 托管 venv 的顺序找；`SKIP_ONLINE=1` 可以跳过。
 
@@ -272,7 +272,7 @@ A 的榜单必须**自己**多出一行。这是唯一能证明实时推送真�
 | [立方数独 3D](https://github.com/yuanshne/shudu3d) | `shudu3d` | 魔方数独：转层分开重复数字，每面补成 1~N² 即胜 |
 | [长夜灯](https://github.com/yuanshne/changyedeng) | `changyedeng` | 锈湖式文字解谜：荒山客栈里一盏吃名字的灯 |
 
-这四款共用同一个联机后端与同一个客户端库：[`puzzle-server`](https://github.com/yuanshne/puzzle-server)。
+数绘、数织、数独 3D 的联机后端各自内置在本仓库的 `server/` 目录里；长夜灯是纯单机叙事游戏，没有后端。
 
 ## 许可
 
