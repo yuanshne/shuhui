@@ -1,0 +1,1787 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#05090f">
+<title>数回 · Slitherlink</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23070f18'/%3E%3Cpath d='M7 10h7v6h11' stroke='%2345d6c0' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M7 10v12h9' stroke='%2345d6c0' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round' opacity='.55'/%3E%3Ccircle cx='25' cy='16' r='2.4' fill='%23e8b96a'/%3E%3Ccircle cx='7' cy='10' r='2' fill='%23e8b96a'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#05090f;
+  --panel:#0a121c;
+  --panel2:#0d1a26;
+  --border:rgba(90,180,200,.14);
+  --border2:rgba(90,180,200,.26);
+  --ink:#d6e6ee;
+  --ink-dim:#657a8b;
+  --cyan:#45d6c0;
+  --cyan-soft:rgba(69,214,192,.16);
+  --cyan-glow:rgba(69,214,192,.5);
+  --amber:#e8b96a;
+  --red:#e5564d;
+  --green:#46b87a;
+  --mono:ui-monospace,"SF Mono",Consolas,"Courier New",monospace;
+  --cs:40px;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{height:100%;}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  font-size:14px; overflow-x:hidden;
+  background-image:radial-gradient(900px 600px at 50% -10%, rgba(69,214,192,.07), transparent 70%);
+}
+button{font:inherit; color:inherit; cursor:pointer; border:none; background:none;}
+button:focus-visible{outline:2px solid var(--cyan); outline-offset:2px;}
+
+/* ---------------- 顶栏 ---------------- */
+header{
+  position:sticky; top:0; z-index:30;
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  padding:10px 16px; background:rgba(5,9,15,.86); backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--border);
+}
+.brand{display:flex; align-items:center; gap:10px;}
+.brand h1{margin:0; font-size:17px; font-weight:700; letter-spacing:.04em;}
+.brand em{display:block; font-style:normal; font-size:9.5px; letter-spacing:.22em; color:var(--ink-dim);}
+.stats{margin-left:auto; display:flex; gap:16px;}
+.stat{text-align:right; min-width:52px;}
+.stat b{display:block; font-family:var(--mono); font-size:15px; font-weight:600; color:var(--cyan);}
+.stat.on b{color:var(--amber);}
+.stat i{font-style:normal; font-size:9.5px; letter-spacing:.14em; color:var(--ink-dim);}
+
+/* ---------------- 工具栏 ---------------- */
+.bar{
+  position:sticky; top:57px; z-index:29;
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  padding:8px 16px; background:rgba(5,9,15,.72); backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--border);
+}
+.seg{display:flex; border:1px solid var(--border); border-radius:8px; overflow:hidden;}
+.seg button{padding:6px 13px; font-size:12.5px; color:var(--ink-dim); transition:.15s;}
+.seg button:hover{color:var(--ink); background:rgba(69,214,192,.06);}
+.seg button.on{background:var(--cyan-soft); color:var(--cyan); font-weight:600;}
+.btn{
+  padding:6px 12px; font-size:12.5px; border:1px solid var(--border); border-radius:8px;
+  color:var(--ink-dim); transition:.15s; white-space:nowrap;
+}
+.btn:hover{color:var(--ink); border-color:var(--border2); background:rgba(69,214,192,.05);}
+.btn.pri{color:var(--cyan); border-color:rgba(69,214,192,.4);}
+.btn.pri:hover{background:var(--cyan-soft);}
+.btn.on{background:var(--cyan-soft); color:var(--cyan); border-color:rgba(69,214,192,.4);}
+.spacer{flex:1;}
+.tip{font-size:11.5px; color:var(--ink-dim); white-space:nowrap;}
+
+/* ---------------- 棋盘 ---------------- */
+main{display:flex; flex-direction:column; align-items:center; padding:18px 12px 40px; gap:12px;}
+.board{width:min(94vw, min(66vh, 720px)); aspect-ratio:1/1; touch-action:none; user-select:none;}
+.board.locked{cursor:default;}
+#board{display:block; width:100%; height:100%; overflow:visible;}
+#board .hit{stroke:transparent; stroke-linecap:round; pointer-events:stroke; cursor:pointer;}
+#board .vis{pointer-events:none; stroke-linecap:round;}
+#board .mark, #board .dot, #board .num{pointer-events:none;}
+#board .vis.on{stroke:var(--cyan); filter:drop-shadow(0 0 4px var(--cyan-glow));}
+#board .vis.offline{stroke:rgba(120,170,190,.055);}
+#board .vis.wrong{stroke:var(--red); filter:drop-shadow(0 0 6px var(--red)); animation:wrongflash .48s;}
+@keyframes wrongflash{0%,100%{opacity:1;} 50%{opacity:.14;}}
+#board .mark{stroke:rgba(229,138,118,.5); stroke-width:1.9; stroke-linecap:round;}
+#board .mark.hide{display:none;}
+#board .dot{fill:rgba(150,195,215,.3);}
+#board .num{
+  font-family:var(--mono); font-weight:700; fill:var(--amber);
+  text-anchor:middle; dominant-baseline:central; opacity:.9;
+}
+#board .num.k0{fill:rgba(150,195,215,.62);}
+#board .cellbox{fill:transparent;}
+#board .cellbox.bad{fill:rgba(229,86,77,.13);}
+#board .cellbox.pulse{animation:pulse .5s;}
+@keyframes pulse{0%{fill:rgba(229,86,77,.42);} 100%{fill:rgba(229,86,77,.13);}}
+
+.panel{
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap; justify-content:center;
+  padding:9px 16px; border:1px solid var(--border); border-radius:10px;
+  background:var(--panel); font-size:12.5px; color:var(--ink-dim); max-width:min(94vw,720px);
+}
+.panel b{color:var(--cyan); font-family:var(--mono); font-weight:600;}
+.panel b.warn{color:var(--amber);}
+.panel b.bad{color:var(--red);}
+
+/* ---------------- 弹窗 ---------------- */
+.modal{
+  position:fixed; inset:0; z-index:60; display:none;
+  align-items:center; justify-content:center; padding:20px;
+  background:rgba(3,6,10,.78); backdrop-filter:blur(4px);
+}
+.modal.show{display:flex;}
+.card{
+  background:var(--panel2); border:1px solid var(--border2); border-radius:14px;
+  padding:22px 24px; max-width:440px; width:100%; max-height:82vh; overflow:auto;
+  box-shadow:0 24px 70px rgba(0,0,0,.6);
+}
+.card h2{margin:0 0 4px; font-size:19px;}
+.card .sub{color:var(--ink-dim); font-size:12px; margin-bottom:16px; letter-spacing:.04em;}
+.grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:16px 0;}
+.kv{background:rgba(69,214,192,.05); border:1px solid var(--border); border-radius:9px; padding:9px 11px;}
+.kv i{display:block; font-style:normal; font-size:10px; color:var(--ink-dim); letter-spacing:.1em; margin-bottom:2px;}
+.kv b{font-family:var(--mono); font-size:16px; color:var(--cyan); font-weight:600;}
+.actions{display:flex; gap:9px; margin-top:18px;}
+.actions .btn{flex:1; text-align:center; padding:9px;}
+.actions .btn.pri{background:var(--cyan-soft);}
+.help h3{margin:16px 0 6px; font-size:13.5px; color:var(--cyan);}
+.help p, .help li{font-size:12.8px; line-height:1.75; color:#b6c8d2; margin:5px 0;}
+.help ul{padding-left:18px; margin:6px 0;}
+.help kbd{
+  font-family:var(--mono); font-size:11px; background:rgba(69,214,192,.1);
+  border:1px solid var(--border); border-radius:4px; padding:1px 5px; color:var(--cyan);
+}
+
+/* ---------------- 轻提示 ---------------- */
+#toast{
+  position:fixed; left:50%; bottom:34px; transform:translate(-50%,14px);
+  z-index:80; padding:9px 18px; border-radius:9px; font-size:13px;
+  background:var(--panel2); border:1px solid var(--border2); color:var(--ink);
+  opacity:0; pointer-events:none; transition:.22s; box-shadow:0 10px 34px rgba(0,0,0,.5);
+}
+#toast.show{opacity:1; transform:translate(-50%,0);}
+
+@media (max-width:560px){
+  .brand em{display:none;}
+  .stats{gap:11px;}
+  .stat{min-width:42px;}
+  .stat b{font-size:13.5px;}
+  .bar{top:52px; gap:6px; padding:7px 10px;}
+  .btn, .seg button{padding:6px 9px; font-size:12px;}
+  .board{width:min(96vw, 58vh);}
+  #board .num{font-size:0.4em;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true">
+      <path d="M7 10h7v7h11" stroke="#45d6c0" stroke-width="2.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M7 10v12h11" stroke="#45d6c0" stroke-width="2.3" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".5"/>
+      <circle cx="25" cy="17" r="2.2" fill="#e8b96a"/>
+    </svg>
+    <div><h1>数回</h1><em>SLITHERLINK</em></div>
+  </div>
+  <div class="stats">
+    <div class="stat"><b id="hudTime">0:00</b><i>时间</i></div>
+    <div class="stat"><b id="hudClues">—</b><i>线索</i></div>
+    <div class="stat on"><b id="hudMiss">0</b><i>失误</i></div>
+    <div class="stat on"><b id="hudScore">0</b><i>分数</i></div>
+  </div>
+</header>
+
+<div class="bar">
+  <div class="seg" id="levelSeg">
+    <button data-lv="easy">初级</button>
+    <button data-lv="normal">中级</button>
+    <button data-lv="hard">高级</button>
+  </div>
+  <button class="btn pri" id="btnNew">新题</button>
+  <button class="btn" id="btnDaily">每日挑战</button>
+  <div class="spacer"></div>
+  <button class="btn" id="btnHint">提示</button>
+  <button class="btn" id="btnDemo">演示</button>
+  <button class="btn" id="btnMark" title="开启后点击边为「确定不在回路上」">标记模式</button>
+  <button class="btn" id="btnCheck">检查</button>
+  <button class="btn" id="btnReset">重来</button>
+  <button class="btn" id="btnHelp">帮助</button>
+</div>
+
+<main>
+  <div class="board" id="boardwrap">
+    <svg id="board" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
+  <div class="panel" id="statusbar">
+    <span id="stMode">经典</span>
+    <span>回路边 <b id="stEdges">0</b></span>
+    <span>待定 <b id="stUnknown">0</b></span>
+    <span id="stMsgWrap">状态 <b class="warn" id="stMsg">进行中</b></span>
+  </div>
+</main>
+
+<div class="modal" id="modalWin">
+  <div class="card">
+    <h2 id="winTitle">回路闭合</h2>
+    <div class="sub" id="winSub">全部线索满足</div>
+    <div class="grid">
+      <div class="kv"><i>用时</i><b id="winTime">0:00</b></div>
+      <div class="kv"><i>失误</i><b id="winMiss">0</b></div>
+      <div class="kv"><i>提示</i><b id="winHints">0</b></div>
+      <div class="kv"><i>分数</i><b id="winScore">0</b></div>
+      <div class="kv"><i>盘面</i><b id="winSize">—</b></div>
+      <div class="kv"><i>最佳</i><b id="winBest">—</b></div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="btnAgain">再来一局</button>
+      <button class="btn pri" id="btnCloseWin">看看棋盘</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modalHelp">
+  <div class="card help">
+    <h2>数回 · 怎么玩</h2>
+    <div class="sub">SLITHERLINK — Nikoli 1989</div>
+    <p>沿点阵的格线连出一条<strong>单一闭合回路</strong>：不分叉、不交叉、不断头。</p>
+    <p>格子里若写着数字，表示这个格子的四条边中，<strong>恰好有几条</strong>属于回路。</p>
+    <h3>操作</h3>
+    <ul>
+      <li><strong>画线</strong>：点击一条边，或按住拖动连续画</li>
+      <li><strong>排除</strong>：右键点击（触屏用「标记模式」），标出确定不在回路上的边</li>
+      <li><strong>擦除</strong>：在已画的边上再点一次</li>
+      <li>快捷键 <kbd>N</kbd> 新题 · <kbd>H</kbd> 提示 · <kbd>D</kbd> 演示 · <kbd>C</kbd> 检查 · <kbd>R</kbd> 重来</li>
+    </ul>
+    <h3>三条能立刻上手的推理</h3>
+    <ul>
+      <li><strong>0 和 4</strong>：0 表示四条边都不在回路上，4 表示四条边全在——先圈出这些格子。</li>
+      <li><strong>3 挨着 0</strong>：3 的格子有四条边，被 0 挡掉共享的那条后，剩下三条必须全画。</li>
+      <li><strong>拐角不落单</strong>：每个点要么没有线，要么恰好两条线。某个点已经连了两条，其余方向立刻排除；只剩一条出路时，那条必须画。</li>
+    </ul>
+    <h3>关于本题库</h3>
+    <p>每道题都由程序从一个随机的单一回路反向挖掘线索生成，并用回溯求解器反复验证<strong>解唯一</strong>——不会出现「另一个也说得通」的尴尬。</p>
+    <div class="actions"><button class="btn pri" id="btnCloseHelp">明白了</button></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>(function(){
+/* ==========================================================================
+ * 数回 · Slitherlink 引擎
+ * --------------------------------------------------------------------------
+ * 规则：在点阵上沿格线连出一条单一闭合回路，不交叉、不分叉；
+ *       格子中的数字表示它四条边里有几条属于回路。
+ *
+ * 坐标系（n×n 个格子、(n+1)×(n+1) 个点）
+ *   水平边 H(r,c)：第 r 行点上、点 (r,c) 与 (r,c+1) 之间   r∈[0,n] c∈[0,n-1]
+ *   垂直边 V(r,c)：第 c 列点上、点 (r,c) 与 (r+1,c) 之间   r∈[0,n-1] c∈[0,n]
+ *   统一编号：H(r,c) → r*n + c
+ *             V(r,c) → n*(n+1) + r*(n+1) + c
+ *
+ * 边状态：UNKNOWN(-1) 未定 / OFF(0) 确定不在回路上 / ON(1) 确定在回路上
+ *
+ * 本文件不依赖 DOM，Node 与浏览器通用。
+ * ========================================================================== */
+
+const UNKNOWN = -1;
+const OFF = 0;
+const ON = 1;
+const NO_CLUE = -1;
+
+/* ==================== 确定性随机 ==================== */
+
+/**
+ * FNV-1a 32 位散列。数字与字符串走同一条路径，`hashSeed(20260914)`
+ * 与 `hashSeed('20260914')` 结果相同 —— 两种入参行为不一致是会埋雷的。
+ *
+ * 存在的理由：直接把日期字符串当种子会踩坑——`'d20260914' >>> 0` 先转数字得 NaN、
+ * 再转 uint32 得 0，于是「每日挑战」每天都是同一道题。任何种子都要先过这里。
+ */
+function hashSeed(seed) {
+  const s = typeof seed === 'string' ? seed : String(seed);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+/** mulberry32 PRNG：接受数字或字符串种子，返回 () => [0,1) 的确定性随机函数。 */
+function mulberry32(seed) {
+  let a = hashSeed(seed);
+  return function () {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* ==================== 盘面布局（索引预计算） ==================== */
+
+/**
+ * 把 n×n 盘面的全部索引关系预先算好，避免求解时反复做除法取模。
+ * 返回的对象在多次求解之间可复用（同尺寸）。
+ */
+function buildLayout(n) {
+  const hCount = n * (n + 1);   // 水平边条数
+  const E = 2 * n * (n + 1);    // 总边数
+  const dots = (n + 1) * (n + 1);
+
+  const H = (r, c) => r * n + c;
+  const V = (r, c) => hCount + r * (n + 1) + c;
+
+  // 每个格子的 4 条边：上/下/左/右
+  const cellE = new Int32Array(n * n * 4);
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      const i = (r * n + c) * 4;
+      cellE[i] = H(r, c);
+      cellE[i + 1] = H(r + 1, c);
+      cellE[i + 2] = V(r, c);
+      cellE[i + 3] = V(r, c + 1);
+    }
+  }
+
+  // 每个点相邻的边（最多 4 条，-1 表示越界）
+  const dotE = new Int32Array(dots * 4).fill(-1);
+  for (let r = 0; r <= n; r++) {
+    for (let c = 0; c <= n; c++) {
+      const i = (r * (n + 1) + c) * 4;
+      if (r > 0) dotE[i] = V(r - 1, c);
+      if (r < n) dotE[i + 1] = V(r, c);
+      if (c > 0) dotE[i + 2] = H(r, c - 1);
+      if (c < n) dotE[i + 3] = H(r, c);
+    }
+  }
+
+  // 每条边的两个端点（点编号）
+  const eA = new Int32Array(E);
+  const eB = new Int32Array(E);
+  for (let r = 0; r <= n; r++) {
+    for (let c = 0; c < n; c++) {
+      const e = H(r, c);
+      eA[e] = r * (n + 1) + c;
+      eB[e] = r * (n + 1) + c + 1;
+    }
+  }
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c <= n; c++) {
+      const e = V(r, c);
+      eA[e] = r * (n + 1) + c;
+      eB[e] = (r + 1) * (n + 1) + c;
+    }
+  }
+
+  // 每条边相邻的格子（最多 2 个，-1 表示盘外）
+  const eCell = new Int32Array(E * 2).fill(-1);
+  for (let r = 0; r <= n; r++) {
+    for (let c = 0; c < n; c++) {
+      const e = H(r, c);
+      if (r > 0) eCell[e * 2] = (r - 1) * n + c;
+      if (r < n) eCell[e * 2 + 1] = r * n + c;
+    }
+  }
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c <= n; c++) {
+      const e = V(r, c);
+      if (c > 0) eCell[e * 2] = r * n + c - 1;
+      if (c < n) eCell[e * 2 + 1] = r * n + c;
+    }
+  }
+
+  return { n, hCount, E, dots, cellE, dotE, eA, eB, eCell, H, V };
+}
+
+/** 空盘：全部边未定。 */
+function emptyState(L) {
+  return new Int8Array(L.E).fill(UNKNOWN);
+}
+
+/* ==================== 约束传播 ==================== */
+
+/**
+ * 传播到不动点。就地修改 st，返回 false 表示出现矛盾。
+ *
+ * 三类规则：
+ *   1. 线索：格 (r,c) 四条边中 ON 的条数必须等于线索值
+ *   2. 度数：每个点相邻边中 ON 的条数只能是 0 或 2（回路不分叉、不留线头）
+ *   3. 回路：ON 边已闭合成环时，不可能再有别的 ON 边；任何会让回路提前闭合
+ *            （闭出的环不含全部 ON 边）的边都必须排除
+ */
+function propagate(L, clue, st) {
+  const nc = L.n * L.n;
+  const nd = L.dots;
+
+  const mark = new Uint8Array(nc + nd);
+  const q = [];
+  let qh = 0;
+  let bad = false;
+
+  const push = (k) => {
+    if (!mark[k]) { mark[k] = 1; q.push(k); }
+  };
+
+  const enqueueEdge = (e) => {
+    const c0 = L.eCell[e * 2];
+    const c1 = L.eCell[e * 2 + 1];
+    if (c0 >= 0) push(c0);
+    if (c1 >= 0) push(c1);
+    push(nc + L.eA[e]);
+    push(nc + L.eB[e]);
+  };
+
+  const setE = (e, v) => {
+    if (st[e] === v) return true;
+    if (st[e] !== UNKNOWN) { bad = true; return false; }
+    st[e] = v;
+    enqueueEdge(e);
+    return true;
+  };
+
+  const runQueue = () => {
+    while (qh < q.length && !bad) {
+      const k = q[qh++];
+      mark[k] = 0;                      // 允许之后重新入队
+      if (k < nc) {
+        const K = clue[k];
+        if (K < 0) continue;
+        const b = k * 4;
+        const e0 = L.cellE[b], e1 = L.cellE[b + 1], e2 = L.cellE[b + 2], e3 = L.cellE[b + 3];
+        const v0 = st[e0], v1 = st[e1], v2 = st[e2], v3 = st[e3];
+        let on = 0, unk = 0;
+        if (v0 === ON) on++; else if (v0 === UNKNOWN) unk++;
+        if (v1 === ON) on++; else if (v1 === UNKNOWN) unk++;
+        if (v2 === ON) on++; else if (v2 === UNKNOWN) unk++;
+        if (v3 === ON) on++; else if (v3 === UNKNOWN) unk++;
+        if (on > K || on + unk < K) { bad = true; return; }
+        if (on + unk === K) {
+          if (v0 === UNKNOWN) setE(e0, ON);
+          if (v1 === UNKNOWN) setE(e1, ON);
+          if (v2 === UNKNOWN) setE(e2, ON);
+          if (v3 === UNKNOWN) setE(e3, ON);
+        } else if (on === K) {
+          if (v0 === UNKNOWN) setE(e0, OFF);
+          if (v1 === UNKNOWN) setE(e1, OFF);
+          if (v2 === UNKNOWN) setE(e2, OFF);
+          if (v3 === UNKNOWN) setE(e3, OFF);
+        }
+      } else {
+        const base = (k - nc) * 4;
+        let on = 0, unk = 0, lastUnk = -1;
+        for (let j = 0; j < 4; j++) {
+          const e = L.dotE[base + j];
+          if (e < 0) continue;
+          const v = st[e];
+          if (v === ON) on++;
+          else if (v === UNKNOWN) { unk++; lastUnk = e; }
+        }
+        if (on > 2) { bad = true; return; }
+        if (on === 2) {
+          for (let j = 0; j < 4; j++) {
+            const e = L.dotE[base + j];
+            if (e >= 0 && st[e] === UNKNOWN) setE(e, OFF);
+          }
+        } else if (on === 1) {
+          if (unk === 0) { bad = true; return; }   // 度数为 1：回路不能有线头
+          if (unk === 1) setE(lastUnk, ON);
+        } else if (unk === 1) {
+          setE(lastUnk, OFF);                       // 只有一条可选却选它 → 度数 1，非法
+        }
+      }
+    }
+  };
+
+  for (let i = 0; i < nc; i++) push(i);
+  for (let i = 0; i < nd; i++) push(nc + i);
+  runQueue();
+  if (bad) return false;
+
+  // 环路规则会把边直接改掉，需要补一次增量传播
+  for (let round = 0; round < 32; round++) {
+    const dirty = applyLoopRule(L, st);
+    if (dirty === false) return false;
+    if (!dirty.length) break;
+    for (let i = 0; i < dirty.length; i++) enqueueEdge(dirty[i]);
+    runQueue();
+    if (bad) return false;
+  }
+  return true;
+}
+
+/**
+ * 回路唯一性规则。返回：
+ *   false        —— 矛盾
+ *   []           —— 无改动
+ *   [e, e, ...]  —— 这些边被确定为 OFF
+ *
+ * 判据：ON 边在度数约束下只能构成路径或环。
+ *   · 已经出现两个环，或一个环之外还有别的 ON 边 → 矛盾（回路只能有一条）
+ *   · 环已经闭合且它就是全部 ON 边 → 回路完成，其余边全部排除
+ *   · 某条未定边两端已连通：闭出的环若不含全部 ON 边 → 该边排除；
+ *     若恰好含全部 ON 边 → 它正是完整回路，不能排除，留给分支去试
+ */
+function applyLoopRule(L, st) {
+  const { n, E, eA, eB, dots } = L;
+  const par = new Int32Array(dots);
+  for (let i = 0; i < dots; i++) par[i] = i;
+  const find = (x) => {
+    while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; }
+    return x;
+  };
+  const union = (a, b) => { a = find(a); b = find(b); if (a !== b) par[a] = b; };
+
+  let onCount = 0;
+  for (let e = 0; e < E; e++) {
+    if (st[e] === ON) { onCount++; union(eA[e], eB[e]); }
+  }
+  if (onCount === 0) return [];
+
+  const dotCnt = new Int32Array(dots);
+  const edgeCnt = new Int32Array(dots);
+  for (let i = 0; i < dots; i++) {
+    const b = i * 4;
+    for (let j = 0; j < 4; j++) {
+      const e = L.dotE[b + j];
+      if (e >= 0 && st[e] === ON) { dotCnt[find(i)]++; break; }
+    }
+  }
+  for (let e = 0; e < E; e++) {
+    if (st[e] === ON) edgeCnt[find(eA[e])]++;
+  }
+
+  // 连通分量里 边数 == 点数 ⇔ 恰好含一个环
+  let loopRoot = -1, loopEdges = 0;
+  for (let i = 0; i < dots; i++) {
+    if (par[i] !== i) continue;
+    if (edgeCnt[i] > 0 && edgeCnt[i] === dotCnt[i]) {
+      if (loopRoot >= 0) return false;          // 两个环
+      loopRoot = i;
+      loopEdges = edgeCnt[i];
+    }
+  }
+  if (loopRoot >= 0 && loopEdges < onCount) return false;   // 有环 + 还有别的 ON 边
+
+  const dirty = [];
+  if (loopRoot >= 0) {
+    // 回路已闭合：它必然是最终回路，其余边全排除
+    for (let e = 0; e < E; e++) {
+      if (st[e] === UNKNOWN) { st[e] = OFF; dirty.push(e); }
+    }
+    return dirty;
+  }
+
+  for (let e = 0; e < E; e++) {
+    if (st[e] !== UNKNOWN) continue;
+    const ra = find(eA[e]);
+    if (ra !== find(eB[e])) continue;
+    // 两端已经连通 ⇒ 选它就会闭合出一个环。这时要分两种情况：
+    //   · 该分量已经含有全部 ON 边 ⇒ 闭合出来的正是完整回路，是个候选解，交给分支去试
+    //   · 否则闭出的环不含全部 ON 边 ⇒ 必然矛盾，直接排除
+    // 少了前一条判断会漏解（一个环的最后一条边恰好连接首尾两端，正是这种情况）。
+    if (edgeCnt[ra] === onCount) continue;
+    st[e] = OFF;
+    dirty.push(e);
+  }
+  return dirty;
+}
+
+/* ==================== 解判定 ==================== */
+
+/** ON 边是否恰好构成一条闭合回路（点数 0 或 2、且连通）。 */
+function isLoop(L, st) {
+  const { E, dots } = L;
+  const deg = new Uint8Array(dots);
+  let onCount = 0, start = -1;
+  for (let e = 0; e < E; e++) {
+    if (st[e] !== ON) continue;
+    onCount++;
+    deg[L.eA[e]]++;
+    deg[L.eB[e]]++;
+    start = L.eA[e];
+  }
+  if (onCount < 4 || start < 0) return false;      // 最小回路是 1 个格子的 4 条边
+  for (let i = 0; i < dots; i++) {
+    if (deg[i] !== 0 && deg[i] !== 2) return false;
+  }
+  const seen = new Uint8Array(E);
+  const vis = new Uint8Array(dots);
+  const stack = [start];
+  vis[start] = 1;
+  let walked = 0;
+  while (stack.length) {
+    const u = stack.pop();
+    const b = u * 4;
+    for (let j = 0; j < 4; j++) {
+      const e = L.dotE[b + j];
+      if (e < 0 || st[e] !== ON || seen[e]) continue;
+      seen[e] = 1;
+      walked++;
+      const w = L.eA[e] === u ? L.eB[e] : L.eA[e];
+      if (!vis[w]) { vis[w] = 1; stack.push(w); }
+    }
+  }
+  return walked === onCount;
+}
+
+/** 所有线索是否都被满足。 */
+function cluesSatisfied(L, clue, st) {
+  const nc = L.n * L.n;
+  for (let i = 0; i < nc; i++) {
+    const K = clue[i];
+    if (K < 0) continue;
+    const b = i * 4;
+    let on = 0;
+    if (st[L.cellE[b]] === ON) on++;
+    if (st[L.cellE[b + 1]] === ON) on++;
+    if (st[L.cellE[b + 2]] === ON) on++;
+    if (st[L.cellE[b + 3]] === ON) on++;
+    if (on !== K) return false;
+  }
+  return true;
+}
+
+/** 局面是否已经是一份完整解答。 */
+function isSolved(L, clue, st) {
+  return isLoop(L, st) && cluesSatisfied(L, clue, st);
+}
+
+/** 违反线索的格子编号列表（用于界面实时提示冲突）。 */
+function conflictedCells(L, clue, st) {
+  const nc = L.n * L.n;
+  const out = [];
+  for (let i = 0; i < nc; i++) {
+    const K = clue[i];
+    if (K < 0) continue;
+    const b = i * 4;
+    let on = 0, unk = 0;
+    for (let j = 0; j < 4; j++) {
+      const v = st[L.cellE[b + j]];
+      if (v === ON) on++;
+      else if (v === UNKNOWN) unk++;
+    }
+    // 已确定地违反，或已无空间可满足
+    if (on > K || on + unk < K) out.push(i);
+  }
+  return out;
+}
+
+/* ==================== 求解 / 计数 ==================== */
+
+/**
+ * 选一条待定边做分支。
+ * 优先挑「线索格中未定边最少」的，分支因子小、剪枝快。
+ */
+function pickBranch(L, clue, st) {
+  const nc = L.n * L.n;
+  let bestE = -1, bestUnk = 99;
+  for (let i = 0; i < nc; i++) {
+    if (clue[i] < 0) continue;
+    const b = i * 4;
+    let unk = 0, first = -1;
+    for (let j = 0; j < 4; j++) {
+      const e = L.cellE[b + j];
+      if (st[e] === UNKNOWN) { unk++; if (first < 0) first = e; }
+    }
+    if (unk > 0 && unk < bestUnk) {
+      bestUnk = unk;
+      bestE = first;
+      if (unk === 1) break;
+    }
+  }
+  if (bestE >= 0) return bestE;
+  for (let e = 0; e < L.E; e++) if (st[e] === UNKNOWN) return e;
+  return -1;
+}
+
+/**
+ * 数一数有几个解，最多数到 limit 个就停（limit=2 即「是否唯一」）。
+ *
+ * budget 是搜索节点预算：超过就放弃，返回 aborted=true。
+ * 存在的理由：个别盘面会让搜索爆炸（实测 10×10 出题时最坏一次验证要 7 秒），
+ * 出题器据此把「拿不准」当成「不能挖」，宁可题目留多一点线索，也不能卡住界面。
+ *
+ * 返回 { count, solution, aborted }。aborted 为真时 count 不可信。
+ */
+function countSolutions(L, clue, st0, limit, budget) {
+  const st = Int8Array.from(st0);
+  const maxNodes = budget == null ? 20000 : budget;
+  let count = 0;
+  let nodes = 0;
+  let aborted = false;
+  let solution = null;
+
+  const dfs = () => {
+    if (count >= limit || aborted) return;
+    if (++nodes > maxNodes) { aborted = true; return; }
+    if (!propagate(L, clue, st)) return;
+
+    if (isLoop(L, st)) {
+      // 回路已经围好：其余边只能全部不在回路上，解唯一确定
+      if (!cluesSatisfied(L, clue, st)) return;
+      count++;
+      if (!solution) solution = Int8Array.from(st);
+      return;
+    }
+
+    const e = pickBranch(L, clue, st);
+    if (e < 0) return;                       // 没有可分支的边，却也不是回路
+
+    const saved = Int8Array.from(st);
+    st[e] = ON;
+    dfs();
+    st.set(saved);
+    if (count >= limit || aborted) return;
+    st[e] = OFF;
+    dfs();
+    st.set(saved);
+  };
+
+  dfs();
+  return { count, solution, aborted };
+}
+
+/** 求一个解；无解或超出预算返回 null。 */
+function solve(L, clue, st0, budget) {
+  const r = countSolutions(L, clue, st0 || emptyState(L), 1, budget == null ? 60000 : budget);
+  return r.count > 0 ? r.solution : null;
+}
+
+/* ==================== 随机区域 → 回路 ==================== */
+
+/**
+ * 随机长出一个 4-连通的多连块（随机生长，从随机起点向外扩张）。
+ */
+function randomRegion(n, rng, target) {
+  const inP = new Uint8Array(n * n);
+  const inF = new Uint8Array(n * n);
+  const frontier = [];
+
+  const r0 = Math.floor(rng() * n);
+  const c0 = Math.floor(rng() * n);
+  inP[r0 * n + c0] = 1;
+  let count = 1;
+
+  const addNb = (i) => {
+    const r = (i / n) | 0, c = i % n;
+    if (r > 0 && !inP[i - n] && !inF[i - n]) { inF[i - n] = 1; frontier.push(i - n); }
+    if (r < n - 1 && !inP[i + n] && !inF[i + n]) { inF[i + n] = 1; frontier.push(i + n); }
+    if (c > 0 && !inP[i - 1] && !inF[i - 1]) { inF[i - 1] = 1; frontier.push(i - 1); }
+    if (c < n - 1 && !inP[i + 1] && !inF[i + 1]) { inF[i + 1] = 1; frontier.push(i + 1); }
+  };
+  addNb(r0 * n + c0);
+
+  while (count < target && frontier.length) {
+    const idx = Math.floor(rng() * frontier.length);
+    const k = frontier[idx];
+    frontier[idx] = frontier[frontier.length - 1];
+    frontier.pop();
+    if (inP[k]) continue;
+    inP[k] = 1;
+    count++;
+    addNb(k);
+  }
+  return { inP, count };
+}
+
+/**
+ * 多连块的边界是否为一条简单闭合回路？
+ *   条件一：不存在 2×2 里恰好两个对角格都属内（会造成边界自接触）
+ *   条件二：补集 4-连通（无洞）
+ */
+function isSimpleRegion(inP, n) {
+  for (let r = 0; r + 1 < n; r++) {
+    for (let c = 0; c + 1 < n; c++) {
+      const a = inP[r * n + c];
+      const b = inP[r * n + c + 1];
+      const d = inP[(r + 1) * n + c];
+      const e = inP[(r + 1) * n + c + 1];
+      if (a + b + d + e === 2 && ((a && e) || (b && d))) return false;
+    }
+  }
+
+  // 在 (n+2)×(n+2) 的虚拟网格上从外部漫延，看能否覆盖全部非内格
+  const W = n + 2;
+  const vis = new Uint8Array(W * W);
+  const isP = (gr, gc) =>
+    gr >= 0 && gc >= 0 && gr < n && gc < n ? inP[gr * n + gc] : 0;
+  const stack = [0];
+  vis[0] = 1;
+  while (stack.length) {
+    const k = stack.pop();
+    const rr = (k / W) | 0, cc = k % W;
+    const nb = [[rr - 1, cc], [rr + 1, cc], [rr, cc - 1], [rr, cc + 1]];
+    for (let t = 0; t < 4; t++) {
+      const nr = nb[t][0], ncc = nb[t][1];
+      if (nr < 0 || ncc < 0 || nr >= W || ncc >= W) continue;
+      const k2 = nr * W + ncc;
+      if (vis[k2]) continue;
+      if (isP(nr - 1, ncc - 1)) continue;
+      vis[k2] = 1;
+      stack.push(k2);
+    }
+  }
+  for (let r = 0; r < W; r++) {
+    for (let c = 0; c < W; c++) {
+      if (!isP(r - 1, c - 1) && !vis[r * W + c]) return false;
+    }
+  }
+  return true;
+}
+
+/** 多连块的边界 → 回路边状态。 */
+function regionToLoop(L, inP) {
+  const n = L.n;
+  const st = new Int8Array(L.E).fill(OFF);
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      if (!inP[r * n + c]) continue;
+      const up = r > 0 ? inP[(r - 1) * n + c] : 0;
+      const down = r < n - 1 ? inP[(r + 1) * n + c] : 0;
+      const left = c > 0 ? inP[r * n + c - 1] : 0;
+      const right = c < n - 1 ? inP[r * n + c + 1] : 0;
+      if (!up) st[L.H(r, c)] = ON;
+      if (!down) st[L.H(r + 1, c)] = ON;
+      if (!left) st[L.V(r, c)] = ON;
+      if (!right) st[L.V(r, c + 1)] = ON;
+    }
+  }
+  return st;
+}
+
+/**
+ * 对回路做「局部翻拐」随机变形：2×2 的四个点里若有 3 条边在回路上，
+ * 换成剩下那条。这一步保持回路单一性（只是把绕远的一小段拉直），
+ * 但能让形状从多连块的方正感变得更自由。
+ */
+function deformLoop(L, st, rng, times) {
+  const n = L.n;
+  let moved = 0;
+  for (let it = 0; it < times; it++) {
+    const r = Math.floor(rng() * n);
+    const c = Math.floor(rng() * n);
+    const e = [L.H(r, c), L.H(r + 1, c), L.V(r, c), L.V(r, c + 1)];
+    let on = 0, offIdx = -1;
+    for (let i = 0; i < 4; i++) {
+      if (st[e[i]] === ON) on++;
+      else offIdx = i;
+    }
+    if (on === 3) {
+      for (let i = 0; i < 4; i++) st[e[i]] = i === offIdx ? ON : OFF;
+      moved++;
+    }
+  }
+  return moved;
+}
+
+/** 由回路算出每个格子的线索。 */
+function cluesFromLoop(L, st) {
+  const nc = L.n * L.n;
+  const clue = new Int8Array(nc).fill(NO_CLUE);
+  for (let i = 0; i < nc; i++) {
+    const b = i * 4;
+    let k = 0;
+    if (st[L.cellE[b]] === ON) k++;
+    if (st[L.cellE[b + 1]] === ON) k++;
+    if (st[L.cellE[b + 2]] === ON) k++;
+    if (st[L.cellE[b + 3]] === ON) k++;
+    clue[i] = k;
+  }
+  return clue;
+}
+
+/* ==================== 出题 ==================== */
+
+/** 原地打乱。 */
+function shuffle(arr, rng) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+  }
+  return arr;
+}
+
+/**
+ * 挖空：把线索一条条拿掉，拿掉后仍唯一解才算数。
+ * 每拿掉一批都要重新验证唯一性——这是唯一能保证「题有唯一解」的做法。
+ *
+ * 一次试一批（batch 条）而不是一条：一批通过就省下 batch-1 次验证；
+ * 整批不过再放回逐条试，保证不会因为图快而少挖。
+ */
+function carve(L, clue, rng, keepRatio, opts) {
+  const nc = L.n * L.n;
+  const batch = (opts && opts.batch) || 4;
+  const budget = (opts && opts.budget) || 4000;
+  const order = [];
+  for (let i = 0; i < nc; i++) order.push(i);
+  shuffle(order, rng);
+
+  const target = Math.max(1, Math.round(nc * keepRatio));
+  const empty = emptyState(L);
+
+  // 唯一解的判据：数到第 2 个就停；超出预算一律当「不唯一」处理（保守）
+  const stillUnique = () => {
+    const r = countSolutions(L, clue, empty, 2, budget);
+    return !r.aborted && r.count === 1;
+  };
+
+  let kept = nc;
+  let idx = 0;
+  while (idx < order.length && kept > target) {
+    const picks = [];
+    while (picks.length < batch && idx < order.length) {
+      const i = order[idx++];
+      if (clue[i] >= 0) picks.push(i);
+    }
+    if (!picks.length) break;
+
+    const saved = picks.map((i) => clue[i]);
+    for (let k = 0; k < picks.length; k++) clue[picks[k]] = NO_CLUE;
+    if (stillUnique()) {
+      kept -= picks.length;
+      continue;
+    }
+
+    // 整批不行：放回去，改成一条一条试，尽量多挖
+    for (let k = 0; k < picks.length; k++) clue[picks[k]] = saved[k];
+    for (let k = 0; k < picks.length; k++) {
+      clue[picks[k]] = NO_CLUE;
+      if (stillUnique()) kept--;
+      else clue[picks[k]] = saved[k];
+    }
+  }
+  return clue;
+}
+
+/**
+ * 出题。
+ *   size       盘面边长
+ *   rng        随机源
+ *   opts.minArea/maxArea  回路覆盖的格子数占比区间
+ *   opts.keepRatio        目标线索保留比例（越小越难）
+ * 返回 { size, clue, solution, clueCount, area }；失败返回 null。
+ */
+function generate(size, rng, opts) {
+  opts = opts || {};
+  const minArea = opts.minArea != null ? opts.minArea : 0.16;
+  const maxArea = opts.maxArea != null ? opts.maxArea : 0.55;
+  const keepRatio = opts.keepRatio != null ? opts.keepRatio : 0.4;
+
+  const L = buildLayout(size);
+  const nc = size * size;
+  const empty = emptyState(L);
+
+  for (let attempt = 0; attempt < 600; attempt++) {
+    const ratio = minArea + rng() * (maxArea - minArea);
+    const { inP, count } = randomRegion(size, rng, Math.max(4, Math.round(nc * ratio)));
+    if (count < 4) continue;
+    if (!isSimpleRegion(inP, size)) continue;
+
+    const sol = regionToLoop(L, inP);
+    if (!isLoop(L, sol)) continue;
+
+    deformLoop(L, sol, rng, 12 + Math.floor(rng() * 24));
+    if (!isLoop(L, sol)) continue;        // 变形理论上安全，仍复检一次
+
+    // 完整线索也未必唯一解，先验一遍，不唯一就换个形状
+    const full = cluesFromLoop(L, sol);
+    const fullCheck = countSolutions(L, full, empty, 2, 40000);
+    if (fullCheck.aborted || fullCheck.count !== 1) continue;
+    const fullCopy = Int8Array.from(full);
+
+    const clue = carve(L, fullCopy, rng, keepRatio, opts);
+
+    // 线索太少会显得空，太多又没意思
+    let clueCount = 0;
+    for (let i = 0; i < nc; i++) if (clue[i] >= 0) clueCount++;
+    if (clueCount < Math.max(3, Math.round(nc * 0.12))) continue;
+
+    // 终检给足预算：这是「唯一解」的最终背书，不能省
+    const finalCheck = countSolutions(L, clue, empty, 2, 400000);
+    if (finalCheck.aborted || finalCheck.count !== 1) continue;
+
+    return { size, clue, solution: sol, clueCount, area: count };
+  }
+  return null;
+}
+
+/* ==================== 便捷封装 ==================== */
+
+/* minArea/maxArea 是回路占盘面的面积比例。太小会让大片格子没有线索、
+   题目看上去空；这里让回路至少占到三分之一左右，线索分布才铺得开。 */
+const DIFFICULTY = {
+  easy: { size: 6, keepRatio: 0.52, minArea: 0.3, maxArea: 0.62 },
+  normal: { size: 8, keepRatio: 0.4, minArea: 0.26, maxArea: 0.62 },
+  hard: { size: 10, keepRatio: 0.3, minArea: 0.24, maxArea: 0.62 },
+};
+
+/** 按难度出题。diff 取 'easy' | 'normal' | 'hard'，也可传 {size, keepRatio,...}。 */
+function makePuzzle(diff, rng) {
+  const cfg = typeof diff === 'string' ? DIFFICULTY[diff] : diff;
+  if (!cfg) throw new Error('未知难度: ' + diff);
+  const r = rng || mulberry32(Date.now());
+  return generate(cfg.size, r, cfg);
+}
+
+/* ==================== 导出 ==================== */
+
+const API = {
+  UNKNOWN, OFF, ON, NO_CLUE,
+  DIFFICULTY,
+  hashSeed,
+  mulberry32,
+  buildLayout,
+  emptyState,
+  propagate,
+  applyLoopRule,
+  isLoop,
+  isSolved,
+  cluesSatisfied,
+  conflictedCells,
+  countSolutions,
+  solve,
+  randomRegion,
+  isSimpleRegion,
+  regionToLoop,
+  deformLoop,
+  cluesFromLoop,
+  carve,
+  generate,
+  makePuzzle,
+};
+
+if (typeof module !== 'undefined' && module.exports) module.exports = API;
+else if (typeof window !== 'undefined') window.SH = API;
+
+})();</script>
+<script>(function(){
+/* ==========================================================================
+ * 数回 · 界面逻辑
+ * 依赖引擎暴露的 window.SH（构建时由 build.py 内联在前一个 <script> 里）
+ * ========================================================================== */
+(function () {
+  'use strict';
+
+  const SH = window.SH;
+  const $ = (sel) => document.querySelector(sel);
+  const NS = 'http://www.w3.org/2000/svg';
+  const CS = 40;        // 一格的边长（SVG 用户单位）
+  const PAD = 26;       // 四周留白，让贴边的回路也看得清
+  const SAVE_KEY = 'shuhui.v1';
+
+  const el = (tag, attrs) => {
+    const n = document.createElementNS(NS, tag);
+    if (attrs) for (const k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  };
+
+  /* ---------------- 状态 ---------------- */
+  const S = {
+    L: null,
+    clue: null,
+    sol: null,
+    edges: null,
+    size: 8,
+    level: 'normal',
+    daily: false,
+    dailyKey: '',
+    key: '',
+    elapsed: 0,
+    t0: 0,
+    running: false,
+    miss: 0,
+    hints: 0,
+    done: false,
+    demoToken: 0,
+    demoBusy: false,
+    markMode: false,
+    locked: false,
+  };
+
+  let edgeVisEls = [];
+  let edgeMarkEls = [];
+  let cellEls = [];
+  let timerId = null;
+  let painting = false;
+  let paintMode = 'on';       // on | off | clear
+
+  /* ---------------- 小工具 ---------------- */
+  let toastTimer = null;
+  function toast(msg) {
+    const t = $('#toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 1900);
+  }
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  function fmtTime(sec) {
+    sec = Math.max(0, Math.floor(sec));
+    const m = Math.floor(sec / 60), s = sec % 60;
+    return m + ':' + String(s).padStart(2, '0');
+  }
+
+  /* 音效：Web Audio 合成，不需要任何素材文件 */
+  let actx = null;
+  function sfx(kind) {
+    try {
+      if (!S.sound) return;
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      const o = actx.createOscillator(), g = actx.createGain();
+      const cfg = {
+        ok: [520, 0.05, 'sine'],
+        off: [300, 0.05, 'triangle'],
+        bad: [150, 0.16, 'sawtooth'],
+        win: [740, 0.42, 'sine'],
+        hint: [880, 0.1, 'sine'],
+      }[kind] || [440, 0.05, 'sine'];
+      o.type = cfg[2];
+      o.frequency.value = cfg[0];
+      g.gain.value = 0.045;
+      g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + cfg[1]);
+      o.connect(g).connect(actx.destination);
+      o.start();
+      o.stop(actx.currentTime + cfg[1]);
+    } catch (e) { /* 音频不可用时静默降级 */ }
+  }
+
+  /* ---------------- 棋盘几何 ---------------- */
+  /** 边索引 → 两端点坐标 */
+  function edgeGeom(e) {
+    const n = S.size;
+    if (e < S.L.hCount) {
+      const r = Math.floor(e / n), c = e % n;
+      return [c * CS, r * CS, (c + 1) * CS, r * CS];
+    }
+    const i = e - S.L.hCount;
+    const r = Math.floor(i / (n + 1)), c = i % (n + 1);
+    return [c * CS, r * CS, c * CS, (r + 1) * CS];
+  }
+
+  function buildBoard() {
+    const svg = $('#board');
+    svg.innerHTML = '';
+    const n = S.size;
+    const W = n * CS;
+    svg.setAttribute('viewBox', `${-PAD} ${-PAD} ${W + PAD * 2} ${W + PAD * 2}`);
+
+    const gCell = el('g'), gHit = el('g'), gVis = el('g'), gMark = el('g'), gDot = el('g'), gNum = el('g');
+
+    // 格子：只作为冲突高亮的底色
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        const box = el('rect', {
+          class: 'cellbox', x: c * CS, y: r * CS, width: CS, height: CS,
+        });
+        gCell.appendChild(box);
+      }
+    }
+
+    edgeVisEls = new Array(S.L.E);
+    edgeMarkEls = new Array(S.L.E);
+    for (let e = 0; e < S.L.E; e++) {
+      const [x1, y1, x2, y2] = edgeGeom(e);
+      // 命中区：一条很粗但不可见的线，让手指/鼠标容易点中
+      gHit.appendChild(el('line', {
+        class: 'hit', x1, y1, x2, y2,
+        'stroke-width': CS * 0.5, 'data-e': e,
+      }));
+      const vis = el('line', { class: 'vis', x1, y1, x2, y2, 'stroke-width': CS * 0.17, 'data-e': e });
+      edgeVisEls[e] = vis;
+      gVis.appendChild(vis);
+
+      // 排除标记：边中点的小叉
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, d = CS * 0.12;
+      const mk = el('path', {
+        class: 'mark hide',
+        d: `M${mx - d} ${my - d}L${mx + d} ${my + d}M${mx - d} ${my + d}L${mx + d} ${my - d}`,
+      });
+      edgeMarkEls[e] = mk;
+      gMark.appendChild(mk);
+    }
+
+    for (let r = 0; r <= n; r++) {
+      for (let c = 0; c <= n; c++) {
+        gDot.appendChild(el('circle', { class: 'dot', cx: c * CS, cy: r * CS, r: CS * 0.055 }));
+      }
+    }
+
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        const i = r * n + c;
+        if (S.clue[i] < 0) continue;
+        const t = el('text', {
+          class: 'num' + (S.clue[i] === 0 ? ' k0' : ''),
+          x: (c + 0.5) * CS, y: (r + 0.5) * CS, 'font-size': CS * 0.46,
+        });
+        t.textContent = String(S.clue[i]);
+        gNum.appendChild(t);
+      }
+    }
+
+    svg.appendChild(gCell);
+    svg.appendChild(gHit);
+    svg.appendChild(gVis);
+    svg.appendChild(gMark);
+    svg.appendChild(gDot);
+    svg.appendChild(gNum);
+    cellEls = Array.from(gCell.children);
+  }
+
+  function paintEdge(e) {
+    const v = S.edges[e];
+    const vis = edgeVisEls[e], mk = edgeMarkEls[e];
+    if (!vis) return;
+    vis.classList.toggle('on', v === SH.ON);
+    vis.classList.toggle('offline', v === SH.OFF);
+    mk.classList.toggle('hide', v !== SH.OFF);
+  }
+
+  function paintAll() {
+    for (let e = 0; e < S.L.E; e++) paintEdge(e);
+    refreshConflicts();
+  }
+
+  /** 线索格被确定性地违反时，给它上一层淡红底 */
+  function refreshConflicts() {
+    const bad = new Set(SH.conflictedCells(S.L, S.clue, S.edges));
+    for (let i = 0; i < cellEls.length; i++) {
+      cellEls[i].classList.toggle('bad', bad.has(i));
+    }
+    return bad.size;
+  }
+
+  function flashWrong(e) {
+    const vis = edgeVisEls[e];
+    if (!vis) return;
+    vis.classList.remove('wrong');
+    void vis.getBoundingClientRect();
+    vis.classList.add('wrong');
+    setTimeout(() => vis.classList.remove('wrong'), 480);
+  }
+
+  function flashCell(i) {
+    const c = cellEls[i];
+    if (!c) return;
+    c.classList.remove('pulse');
+    void c.getBoundingClientRect();
+    c.classList.add('pulse');
+    setTimeout(() => c.classList.remove('pulse'), 520);
+  }
+
+  /* ---------------- 计分 / 统计 ---------------- */
+  function calcScore() {
+    const base = S.size * S.size * 32;
+    return Math.max(0, base - Math.floor(S.elapsed) * 2 - S.miss * 80 - S.hints * 60);
+  }
+
+  function hudRefresh() {
+    $('#hudTime').textContent = fmtTime(S.elapsed);
+    $('#hudClues').textContent = S.clue ? S.clue.filter((v) => v >= 0).length : '—';
+    $('#hudMiss').textContent = S.miss;
+    $('#hudScore').textContent = calcScore();
+
+    let on = 0, unk = 0;
+    for (let e = 0; e < S.L.E; e++) {
+      if (S.edges[e] === SH.ON) on++;
+      else if (S.edges[e] === SH.UNKNOWN) unk++;
+    }
+    $('#stEdges').textContent = on;
+    $('#stUnknown').textContent = unk;
+
+    const msgEl = $('#stMsg');
+    if (S.done) { msgEl.textContent = '已完成'; msgEl.className = ''; }
+    else if (refreshConflicts() > 0) { msgEl.textContent = '有线索被违反'; msgEl.className = 'bad'; }
+    else {
+      const unsat = countUnsatisfied();
+      msgEl.textContent = unsat > 0 ? `还有 ${unsat} 个线索格未满足` : '线索已全部满足';
+      msgEl.className = 'warn';
+    }
+  }
+
+  function countUnsatisfied() {
+    let c = 0;
+    const nc = S.size * S.size;
+    for (let i = 0; i < nc; i++) {
+      const K = S.clue[i];
+      if (K < 0) continue;
+      const b = i * 4;
+      let on = 0;
+      for (let j = 0; j < 4; j++) if (S.edges[S.L.cellE[b + j]] === SH.ON) on++;
+      if (on !== K) c++;
+    }
+    return c;
+  }
+
+  /* ---------------- 计时 ---------------- */
+  function startTimer() {
+    if (S.running || S.done) return;
+    S.running = true;
+    S.t0 = Date.now() - S.elapsed * 1000;
+    clearInterval(timerId);
+    timerId = setInterval(() => {
+      S.elapsed = (Date.now() - S.t0) / 1000;
+      $('#hudTime').textContent = fmtTime(S.elapsed);
+      $('#hudScore').textContent = calcScore();
+    }, 500);
+  }
+
+  function stopTimer() {
+    S.running = false;
+    clearInterval(timerId);
+  }
+
+  /* ---------------- 操作 ---------------- */
+  function afterChange() {
+    refreshConflicts();
+    hudRefresh();
+    save();
+    if (SH.isSolved(S.L, S.clue, S.edges)) win();
+  }
+
+  function userSet(e, v) {
+    if (S.done || S.locked) return;
+    if (v !== SH.UNKNOWN && v !== S.sol[e]) {
+      S.miss++;
+      flashWrong(e);
+      sfx('bad');
+      hudRefresh();
+      toast(v === SH.ON ? '这条边不在回路上' : '这条边其实在回路上');
+      save();
+      return;
+    }
+    if (S.edges[e] === v) return;
+    S.edges[e] = v;
+    paintEdge(e);
+    if (v === SH.UNKNOWN) sfx('off'); else sfx('ok');
+    startTimer();
+    afterChange();
+  }
+
+  function edgeFromPoint(ev) {
+    const t = document.elementFromPoint(ev.clientX, ev.clientY);
+    if (!t || t.dataset === undefined || t.dataset.e === undefined) return -1;
+    return Number(t.dataset.e);
+  }
+
+  function onDown(ev) {
+    if (S.done || S.locked) return;
+    const e = edgeFromPoint(ev);
+    if (e < 0) return;
+    ev.preventDefault();
+    stopDemo();
+    const right = ev.button === 2;
+    const wantMark = right || S.markMode;
+    if (wantMark) paintMode = S.edges[e] === SH.OFF ? 'clear' : 'off';
+    else paintMode = S.edges[e] === SH.ON ? 'clear' : 'on';
+    painting = true;
+    applyPaint(e);
+    try { $('#board').setPointerCapture(ev.pointerId); } catch (err) { /* 忽略 */ }
+  }
+
+  function onMove(ev) {
+    if (!painting) return;
+    ev.preventDefault();
+    const e = edgeFromPoint(ev);
+    if (e >= 0) applyPaint(e);
+  }
+
+  function onUp() { painting = false; }
+
+  function applyPaint(e) {
+    if (paintMode === 'on' && S.edges[e] === SH.UNKNOWN) userSet(e, SH.ON);
+    else if (paintMode === 'off' && S.edges[e] === SH.UNKNOWN) userSet(e, SH.OFF);
+    else if (paintMode === 'clear' && S.edges[e] !== SH.UNKNOWN) userSet(e, SH.UNKNOWN);
+  }
+
+  /* ---------------- 提示 / 演示 / 检查 ---------------- */
+  function hint() {
+    if (S.done || S.locked) return;
+    stopDemo();
+    const st = Int8Array.from(S.edges);
+    const consistent = SH.propagate(S.L, S.clue, st);
+    const cands = [];
+    if (consistent) {
+      for (let e = 0; e < S.L.E; e++) {
+        if (st[e] !== SH.UNKNOWN && S.edges[e] === SH.UNKNOWN) cands.push([e, st[e]]);
+      }
+    }
+    let reasoned = true;
+    if (!cands.length) {
+      // 传播推不动：这一步只能靠试探，直接取答案里的一条
+      reasoned = false;
+      for (let e = 0; e < S.L.E; e++) {
+        if (S.edges[e] === SH.UNKNOWN) { cands.push([e, S.sol[e]]); break; }
+      }
+    }
+    if (!cands.length) { toast('所有边都已确定'); return; }
+
+    const [e, v] = cands[0];
+    S.hints++;
+    S.edges[e] = v;
+    paintEdge(e);
+    startTimer();
+    sfx('hint');
+    toast(reasoned ? '这一步可以直接推出来' : '推不出来了，这条只能试');
+    afterChange();
+  }
+
+  function stopDemo() {
+    S.demoToken++;
+    S.demoBusy = false;
+    $('#btnDemo').classList.remove('on');
+  }
+
+  async function demo() {
+    if (S.done || S.locked || S.demoBusy) { stopDemo(); return; }
+    S.demoBusy = true;
+    const token = ++S.demoToken;
+    $('#btnDemo').classList.add('on');
+    toast('演示推理中…');
+    startTimer();
+
+    for (let step = 0; step < 400; step++) {
+      if (token !== S.demoToken) return;
+      const st = Int8Array.from(S.edges);
+      const consistent = SH.propagate(S.L, S.clue, st);
+      const newly = [];
+      if (consistent) {
+        for (let e = 0; e < S.L.E; e++) {
+          if (st[e] !== SH.UNKNOWN && S.edges[e] === SH.UNKNOWN) newly.push([e, st[e]]);
+        }
+      }
+      if (!newly.length) {
+        // 传播到头，补一条答案里的边继续
+        for (let e = 0; e < S.L.E; e++) {
+          if (S.edges[e] === SH.UNKNOWN) { newly.push([e, S.sol[e]]); break; }
+        }
+      }
+      if (!newly.length) break;
+
+      const take = newly.slice(0, 8);
+      for (let k = 0; k < take.length; k++) {
+        S.edges[take[k][0]] = take[k][1];
+        paintEdge(take[k][0]);
+      }
+      refreshConflicts();
+      hudRefresh();
+      await sleep(200);
+      if (token !== S.demoToken) return;
+      if (SH.isSolved(S.L, S.clue, S.edges)) break;
+    }
+
+    if (token === S.demoToken) {
+      S.demoBusy = false;
+      $('#btnDemo').classList.remove('on');
+      save();
+      if (SH.isSolved(S.L, S.clue, S.edges)) win();
+    }
+  }
+
+  function check() {
+    if (S.done) { toast('已经完成了'); return; }
+    const bad = refreshConflicts();
+    const unsat = countUnsatisfied();
+    const st = Int8Array.from(S.edges);
+    const consistent = SH.propagate(S.L, S.clue, st);
+    let deducible = 0;
+    if (consistent) {
+      for (let e = 0; e < S.L.E; e++) {
+        if (st[e] !== SH.UNKNOWN && S.edges[e] === SH.UNKNOWN) deducible++;
+      }
+    }
+    if (bad > 0) toast(`${bad} 个线索格已被违反，需要退回去改`);
+    else if (unsat === 0) toast('线索都对上了，只差把回路围起来');
+    else toast(`还有 ${unsat} 个线索格没满足，其中 ${deducible} 条边可以直接推出来`);
+  }
+
+  function reset() {
+    if (S.locked) return;
+    stopDemo();
+    S.edges = SH.emptyState(S.L);
+    S.miss = 0; S.hints = 0; S.elapsed = 0; S.done = false; S.running = false;
+    stopTimer();
+    paintAll();
+    hudRefresh();
+    save();
+    toast('已清空重来');
+  }
+
+  /* ---------------- 胜负 ---------------- */
+  function win() {
+    if (S.done) return;
+    S.done = true;
+    stopTimer();
+    stopDemo();
+    sfx('win');
+
+    const isNew = S.key ? (SAVE.best[S.key] == null || S.elapsed < SAVE.best[S.key]) : false;
+    if (S.key && isNew) SAVE.best[S.key] = S.elapsed;
+
+    if (S.dailyKey) {
+      const rec = SAVE.daily[S.dailyKey] || { done: false, count: 0, best: null };
+      rec.done = true;
+      rec.count = (rec.count || 0) + 1;
+      rec.best = rec.best == null ? S.elapsed : Math.min(rec.best, S.elapsed);
+      SAVE.daily[S.dailyKey] = rec;
+    }
+    writeSave();
+
+    $('#winTitle').textContent = S.daily ? '今日挑战完成' : '回路闭合';
+    $('#winSub').textContent = isNew ? '新纪录！全部线索满足，回路单一闭合' : '全部线索满足，回路单一闭合';
+    $('#winTime').textContent = fmtTime(S.elapsed);
+    $('#winMiss').textContent = S.miss;
+    $('#winHints').textContent = S.hints;
+    $('#winScore').textContent = calcScore();
+    $('#winSize').textContent = S.size + '×' + S.size;
+    const best = S.key ? SAVE.best[S.key] : null;
+    $('#winBest').textContent = best == null ? '—' : fmtTime(best);
+    $('#modalWin').classList.add('show');
+    hudRefresh();
+    save();
+  }
+
+  /* ---------------- 存档 ---------------- */
+  let SAVE = { best: {}, daily: {}, cur: null };
+  let SAVE_load_error = false;
+
+  function loadSave() {
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (raw) {
+        const d = JSON.parse(raw);
+        SAVE.best = d.best || {};
+        SAVE.daily = d.daily || {};
+        SAVE.cur = d.cur || null;
+      }
+    } catch (e) { SAVE_load_error = true; }
+  }
+
+  function writeSave() {
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(SAVE)); } catch (e) { /* 隐私模式下忽略 */ }
+  }
+
+  function save() {
+    if (!S.L) return;
+    SAVE.cur = {
+      size: S.size,
+      clue: Array.from(S.clue),
+      sol: Array.from(S.sol),
+      edges: Array.from(S.edges),
+      elapsed: Math.floor(S.elapsed),
+      miss: S.miss,
+      hints: S.hints,
+      done: S.done,
+      level: S.level,
+      daily: S.daily,
+      dailyKey: S.dailyKey,
+      key: S.key,
+    };
+    writeSave();
+  }
+
+  /* ---------------- 开局 ---------------- */
+  function startPuzzle(p, opt) {
+    opt = opt || {};
+    S.size = p.size;
+    S.L = SH.buildLayout(p.size);
+    S.clue = p.clue;
+    S.sol = p.solution;
+    S.edges = SH.emptyState(S.L);
+    S.level = opt.level || S.level;
+    S.daily = !!opt.daily;
+    S.dailyKey = opt.dailyKey || '';
+    S.key = opt.key || '';
+    S.elapsed = 0; S.miss = 0; S.hints = 0;
+    S.done = false; S.running = false; S.demoBusy = false; S.demoToken++;
+    stopTimer();
+    buildBoard();
+    paintAll();
+    hudRefresh();
+    $('#modalWin').classList.remove('show');
+    $('#stMode').textContent = S.daily ? '每日挑战 · ' + fmtDaily(S.dailyKey) : ({ easy: '初级', normal: '中级', hard: '高级' }[S.level] || '经典');
+    document.querySelectorAll('#levelSeg button').forEach((b) => {
+      b.classList.toggle('on', !S.daily && b.dataset.lv === S.level);
+    });
+    $('#btnDaily').classList.toggle('on', S.daily);
+    save();
+  }
+
+  function fmtDaily(key) {
+    const m = /^d(\d{4})(\d{2})(\d{2})$/.exec(key || '');
+    return m ? `${m[1]}.${m[2]}.${m[3]}` : '';
+  }
+
+  function newPuzzle(level) {
+    if (S.locked) return;
+    S.locked = true;
+    stopDemo();
+    toast('正在出题…');
+    // 让浏览器先把「出题中」画出来，再去做重活（高级盘要几百毫秒）
+    setTimeout(() => {
+      try {
+        const rng = SH.mulberry32('rnd-' + Date.now() + '-' + Math.random());
+        const cfg = SH.DIFFICULTY[level] || SH.DIFFICULTY.normal;
+        let p = null;
+        for (let k = 0; k < 3 && !p; k++) {
+          p = SH.generate(cfg.size, rng, cfg);
+        }
+        if (!p) { toast('出题失败，请再点一次'); return; }
+        startPuzzle(p, { level: level, key: 'rnd-' + Math.floor(Math.random() * 1e9) });
+        toast(({ easy: '初级', normal: '中级', hard: '高级' }[level] || '') + ' · ' + cfg.size + '×' + cfg.size);
+      } finally {
+        S.locked = false;
+      }
+    }, 16);
+  }
+
+  function startDaily() {
+    if (S.locked) return;
+    const d = new Date();
+    const ymd = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+    const dailyKey = 'd' + ymd;
+    const seed = SH.hashSeed(dailyKey);            // 必须散列：'d20260914' >>> 0 会变成 0
+    const level = ['easy', 'normal', 'hard'][d.getDay() % 3];
+    const cfg = SH.DIFFICULTY[level];
+
+    S.locked = true;
+    stopDemo();
+    toast('正在出题…');
+    setTimeout(() => {
+      try {
+        const p = SH.generate(cfg.size, SH.mulberry32(seed), cfg);
+        if (!p) { toast('今日题目生成失败'); return; }
+        startPuzzle(p, { level: level, daily: true, dailyKey: dailyKey, key: 'daily-' + dailyKey });
+        const rec = SAVE.daily[dailyKey];
+        if (rec && rec.count) {
+          toast(`今日已挑战 ${rec.count} 次，最佳 ${fmtTime(rec.best)}`);
+        } else {
+          toast('今日挑战 · ' + fmtDaily(dailyKey));
+        }
+      } finally {
+        S.locked = false;
+      }
+    }, 16);
+  }
+
+  /* ---------------- 启动 ---------------- */
+  function init() {
+    loadSave();
+
+    $('#board').addEventListener('pointerdown', onDown);
+    $('#board').addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    $('#board').addEventListener('contextmenu', (e) => e.preventDefault());
+
+    $('#btnNew').addEventListener('click', () => newPuzzle(S.level));
+    $('#btnDaily').addEventListener('click', startDaily);
+    $('#btnHint').addEventListener('click', hint);
+    $('#btnDemo').addEventListener('click', () => (S.demoBusy ? stopDemo() : demo()));
+    $('#btnCheck').addEventListener('click', check);
+    $('#btnReset').addEventListener('click', reset);
+    $('#btnHelp').addEventListener('click', () => $('#modalHelp').classList.add('show'));
+    $('#btnCloseHelp').addEventListener('click', () => $('#modalHelp').classList.remove('show'));
+    $('#btnCloseWin').addEventListener('click', () => $('#modalWin').classList.remove('show'));
+    $('#btnAgain').addEventListener('click', () => {
+      $('#modalWin').classList.remove('show');
+      if (S.daily) startDaily(); else newPuzzle(S.level);
+    });
+    $('#btnMark').addEventListener('click', () => {
+      S.markMode = !S.markMode;
+      $('#btnMark').classList.toggle('on', S.markMode);
+      toast(S.markMode ? '标记模式：点击边 = 确定不在回路上' : '标记模式已关闭');
+    });
+    document.querySelectorAll('#levelSeg button').forEach((b) => {
+      b.addEventListener('click', () => { S.level = b.dataset.lv; newPuzzle(S.level); });
+    });
+    document.querySelectorAll('.modal').forEach((m) => {
+      m.addEventListener('click', (e) => { if (e.target === m) m.classList.remove('show'); });
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+      const k = e.key.toLowerCase();
+      if (k === 'n') newPuzzle(S.level);
+      else if (k === 'h') hint();
+      else if (k === 'd') (S.demoBusy ? stopDemo() : demo());
+      else if (k === 'c') check();
+      else if (k === 'r') reset();
+      else if (k === 'escape') document.querySelectorAll('.modal').forEach((m) => m.classList.remove('show'));
+      else return;
+      e.preventDefault();
+    });
+
+    // 有存档就接着玩，否则开一局中级
+    if (SAVE.cur && SAVE.cur.clue && SAVE.cur.edges) {
+      const c = SAVE.cur;
+      const L = SH.buildLayout(c.size);
+      S.size = c.size;
+      S.L = L;
+      S.clue = Int8Array.from(c.clue);
+      S.sol = Int8Array.from(c.sol);
+      S.edges = Int8Array.from(c.edges);
+      S.elapsed = c.elapsed || 0;
+      S.miss = c.miss || 0;
+      S.hints = c.hints || 0;
+      S.done = !!c.done;
+      S.level = c.level || 'normal';
+      S.daily = !!c.daily;
+      S.dailyKey = c.dailyKey || '';
+      S.key = c.key || '';
+      buildBoard();
+      paintAll();
+      hudRefresh();
+      $('#stMode').textContent = S.daily ? '每日挑战 · ' + fmtDaily(S.dailyKey) : ({ easy: '初级', normal: '中级', hard: '高级' }[S.level] || '经典');
+      document.querySelectorAll('#levelSeg button').forEach((b) => b.classList.toggle('on', !S.daily && b.dataset.lv === S.level));
+      $('#btnDaily').classList.toggle('on', S.daily);
+      toast('已恢复上次的进度');
+    } else {
+      newPuzzle('normal');
+    }
+  }
+
+  /* ---------------- 调试 API（供自动化测试使用） ---------------- */
+  window.__shuhui = {
+    version: '1.0',
+    state: () => ({
+      size: S.size, level: S.level, daily: S.daily, done: S.done,
+      elapsed: S.elapsed, miss: S.miss, hints: S.hints, score: calcScore(),
+      key: S.key, dailyKey: S.dailyKey, locked: S.locked, demoBusy: S.demoBusy,
+      markMode: S.markMode, clueCount: S.clue ? S.clue.filter((v) => v >= 0).length : 0,
+      onEdges: Array.from(S.edges || []).filter((v) => v === SH.ON).length,
+      unknown: Array.from(S.edges || []).filter((v) => v === SH.UNKNOWN).length,
+    }),
+    dims: () => ({
+      size: S.size, edges: S.L.E, dots: S.L.dots, cells: S.size * S.size,
+      svgEdges: document.querySelectorAll('#board .vis').length,
+      svgHits: document.querySelectorAll('#board .hit').length,
+      svgMarks: document.querySelectorAll('#board .mark').length,
+      svgNums: document.querySelectorAll('#board .num').length,
+      viewBox: document.querySelector('#board').getAttribute('viewBox'),
+    }),
+    clue: () => Array.from(S.clue),
+    sol: () => Array.from(S.sol),
+    edges: () => Array.from(S.edges),
+    edgeRect: (e) => {
+      const vis = edgeVisEls[e];
+      if (!vis) return null;
+      const r = vis.getBoundingClientRect();
+      return { x: r.x, y: r.y, w: r.width, h: r.height, cx: r.x + r.width / 2, cy: r.y + r.height / 2 };
+    },
+    clueRect: (i) => {
+      const b = cellEls[i];
+      if (!b) return null;
+      const r = b.getBoundingClientRect();
+      return { x: r.x, y: r.y, w: r.width, h: r.height, cx: r.x + r.width / 2, cy: r.y + r.height / 2 };
+    },
+    setEdge: (e, v) => { S.edges[e] = v; paintEdge(e); afterChange(); },
+    fillSolution: () => { S.edges.set(S.sol); paintAll(); hudRefresh(); save(); if (SH.isSolved(S.L, S.clue, S.edges)) win(); },
+    firstUnknown: () => S.edges.findIndex((v) => v === SH.UNKNOWN),
+    clearAll: () => { S.edges = SH.emptyState(S.L); paintAll(); hudRefresh(); },
+    isSolvedNow: () => SH.isSolved(S.L, S.clue, S.edges),
+    conflicts: () => Array.from(SH.conflictedCells(S.L, S.clue, S.edges)),
+    hint, demo, check, reset,
+    newPuzzle, startDaily,
+    save: () => { save(); return SAVE; },
+    sound: (on) => { S.sound = !!on; },
+  };
+  S.sound = false;   // 默认静音，避免自动化测试时出声
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+
+})();</script>
+</body>
+</html>

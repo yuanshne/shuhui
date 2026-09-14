@@ -1,0 +1,13 @@
+{
+  "name": "shuhui-tests",
+  "version": "1.0.0",
+  "description": "数回的真实 UI 测试（Playwright 驱动 Chromium）",
+  "type": "module",
+  "scripts": {
+    "test": "node test.mjs"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "playwright-core": "^1.63.0"
+  }
+}
