@@ -1492,6 +1492,18 @@ else if (typeof window !== 'undefined') window.SH = API;
     });
   };
 
+  /**
+   * 叙事类游戏的全局分布：各结局被多少人走到、灯花收集度分布。
+   * 只对 kind === 'narrative' 的游戏有效，判分游戏调用会得到 400。
+   */
+  PuzzleClient.prototype.narrativeStats = function (game, options) {
+    options = options || {};
+    var query = [];
+    if (options.limit) query.push('limit=' + options.limit);
+    return this._fetch('/stats/' + encodeURIComponent(game || this.options.game) +
+      '/narrative' + (query.length ? '?' + query.join('&') : ''));
+  };
+
   // ------------------------------------------------ 实时推送
 
   /**
