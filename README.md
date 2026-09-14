@@ -1,5 +1,7 @@
 # 数回 · Slitherlink
 
+![CI](https://github.com/yuanshne/shuhui/actions/workflows/ci.yml/badge.svg)
+
 一个零依赖的单文件网页游戏。沿点阵的格线连出一条**单一闭合回路**——不分叉、不交叉、不断头；
 格子里写着几，就说明这个格子的四条边里有几条属于回路。
 
@@ -260,6 +262,17 @@ A 的榜单必须**自己**多出一行。这是唯一能证明实时推送真�
 
 数回是 Nikoli 1989 年的原创谜题（Puzzle Communication Nikoli #26），
 原名「スリザーリンク」，英文通常叫 Slitherlink，也叫 Fences、Loop the Loop。
+
+## 姊妹项目
+
+| 游戏 | 仓库 | 说明 |
+|------|------|------|
+| 数回 Slitherlink | `shuhui`（本仓库） | 一笔画闭环填边，唯一解保证 |
+| [数织·奇想](https://github.com/yuanshne/shuzhi) | `shuzhi` | 经典/马赛克双玩法、每日挑战、16 幅像素画画廊、唯一解保证 |
+| [立方数独 3D](https://github.com/yuanshne/shudu3d) | `shudu3d` | 魔方数独：转层分开重复数字，每面补成 1~N² 即胜 |
+| [长夜灯](https://github.com/yuanshne/changyedeng) | `changyedeng` | 锈湖式文字解谜：荒山客栈里一盏吃名字的灯 |
+
+这四款共用同一个联机后端与同一个客户端库：[`puzzle-server`](https://github.com/yuanshne/puzzle-server)。
 
 ## 许可
 

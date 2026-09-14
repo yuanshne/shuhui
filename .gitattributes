@@ -3,3 +3,8 @@
 # 因此绝不能让 git 的换行转换碰它 —— 一旦检出时被转成 CRLF，
 # 校验就会报"漂移"，而代码其实一个字都没变。
 src/puzzle-client.js -text
+
+# 构建产物：build.py 统一输出 CRLF。这里必须钉住字节 —— 不钉的话 git 在提交时
+# 会把 CRLF 规整成 LF，于是任何非 Windows 平台 clone 下来重建都会"整个文件都变了"
+# （内容其实逐字节一样）。CI 里"重建后 git diff 必须为空"那一步靠这个才成立。
+index.html -text
