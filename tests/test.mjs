@@ -467,7 +467,53 @@ section('窄屏布局');
 }
 
 /* ============================================================
- * 11. 控制台
+ * 11. 离线降级：联机层必须一声不吭
+ * ============================================================
+ * 这轮测试全程跑在 file:// 下，也就是「双击文件就能玩」的那种用法。
+ * 联机是加成不是前提，所以这里要确认它没有在任何一个环节上变成负担：
+ * 不报错、不卡住、不拦操作，结算文案老老实实说自己在离线。
+ */
+section('离线降级');
+{
+  const n = await page.evaluate(() => ({
+    hasClient: window.__shuhui.net.hasClient(),
+    ready: window.__shuhui.net.ready(),
+    label: window.__shuhui.net.label(),
+    loggedIn: window.__shuhui.net.loggedIn(),
+    api: window.__shuhui.net.api(),
+  }));
+  check('联机库已随单文件一起加载', n.hasClient === true);
+  check('file:// 下不会误判为已连上', n.ready === false, JSON.stringify(n));
+  check('工具栏显示「离线」', n.label === '离线', n.label);
+  check('未登录', n.loggedIn === false);
+
+  const pending = await page.evaluate(() => window.__shuhui.net.pendingText());
+  check('本地题的结算文案写明不计入榜单', /离线/.test(pending), pending);
+
+  // openBoard 在离线时应当立刻给出可操作的提示，而不是干等探测超时
+  const t0 = Date.now();
+  const boardMsg = await page.evaluate(async () => {
+    await window.__shuhui.net.openBoard();
+    return document.querySelector('#lbList li').textContent;
+  });
+  const cost = Date.now() - t0;
+  check('离线时榜单给出可操作的提示', /连不上|没有加载/.test(boardMsg), boardMsg);
+  check('离线时榜单不会卡住等待', cost < 1500, cost + 'ms');
+  await page.evaluate(() => document.querySelector('#modalBoard').classList.remove('show'));
+
+  // 关键的一条：离线时「每日挑战」必须仍然可用，且走本地出题
+  await page.evaluate(() => window.__shuhui.startDaily());
+  await page.waitForFunction(
+    () => window.__shuhui.state().daily && !window.__shuhui.state().locked,
+    null, { timeout: 60000 });
+  const offlineDaily = await page.evaluate(() => window.__shuhui.state());
+  check('离线仍能玩每日挑战', offlineDaily.daily === true);
+  check('离线时没有服务端题号', offlineDaily.onlineId === null, String(offlineDaily.onlineId));
+  check('离线状态栏标为本地', /本地/.test(offlineDaily.timeLabel), offlineDaily.timeLabel);
+}
+
+/* ============================================================
+ * 12. 控制台
  * ============================================================ */
 section('控制台');
 check('无 console 错误、无未捕获异常', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '));

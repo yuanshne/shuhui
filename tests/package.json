@@ -4,7 +4,8 @@
   "description": "数回的真实 UI 测试（Playwright 驱动 Chromium）",
   "type": "module",
   "scripts": {
-    "test": "node test.mjs"
+    "test": "node test.mjs",
+    "test:online": "node online.mjs"
   },
   "license": "MIT",
   "dependencies": {
